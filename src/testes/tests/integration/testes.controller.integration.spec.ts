@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
 import { TestesModule } from '../../testes.module';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -7,6 +7,8 @@ import { Model } from 'mongoose';
 import { getModelToken } from '@nestjs/mongoose';
 import { Testes, TestesSchema } from '../../schemas/testes.schema';
 import { ConfigModule } from '@nestjs/config';
+
+const nonExistentValue = 'nonExistentValue';
 
 describe('TestesController (integration)', () => {
   let app: INestApplication;
@@ -25,6 +27,7 @@ describe('TestesController (integration)', () => {
     }).compile();
 
     app = moduleRef.createNestApplication();
+    app.useGlobalPipes(new ValidationPipe());
     await app.init();
 
     model = moduleRef.get<Model<Testes>>(getModelToken(Testes.name));
@@ -156,6 +159,66 @@ describe('TestesController (integration)', () => {
             otherValue: 1,
             uniqueValue: 'Test1',
           }),
+        );
+      });
+  });
+
+  it('/POST testes (erro de validação)', async () => {
+    const createDto = {
+      otherValue: 3,
+      uniqueValue: 'Test3',
+    };
+    return request(app.getHttpServer())
+      .post('/testes')
+      .send(createDto)
+      .expect(400)
+      .expect((res) => {
+        expect(res.body).toHaveProperty('message');
+        expect(res.body.message).toContain('testValue should not be empty');
+      });
+  });
+
+  it('/GET testes/:uniqueValue (documento inexistente)', async () => {
+    return request(app.getHttpServer())
+      .get(`/testes/${nonExistentValue}`)
+      .expect(404)
+      .expect((res) => {
+        expect(res.body).toHaveProperty('message');
+        expect(res.body.message).toContain(
+          `Test ${nonExistentValue} not found`,
+        );
+      });
+  });
+
+  it('/PATCH testes/:uniqueValue (erro de validação)', async () => {
+    const test = new model({
+      testValue: 'Teste 1',
+      otherValue: 1,
+      uniqueValue: 'Test1',
+    });
+    const savedTest = await test.save();
+    const updateDto = { testValue: '', otherValue: 4 };
+
+    return request(app.getHttpServer())
+      .patch(`/testes/${savedTest.uniqueValue}`)
+      .send(updateDto)
+      .expect(400)
+      .expect((res) => {
+        expect(res.body).toHaveProperty('message');
+        expect(res.body.message).toContain(
+          'Field testValue should not be empty or contain only spaces',
+        );
+      });
+  });
+
+  it('/DELETE testes/:uniqueValue (documento inexistente)', async () => {
+    return request(app.getHttpServer())
+      .delete(`/testes/${nonExistentValue}`)
+      .expect(404)
+      .expect((res) => {
+        expect(res.body).toHaveProperty('message');
+        expect(res.body.message).toContain(
+          `Test ${nonExistentValue} not found`,
         );
       });
   });

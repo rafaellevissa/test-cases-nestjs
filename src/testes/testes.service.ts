@@ -45,6 +45,9 @@ export class TestesService {
     const result = await this.testeModel
       .findOneAndDelete({ uniqueValue })
       .exec();
+    if (!result) {
+      throw new NotFoundException(`Test ${uniqueValue} not found`);
+    }
     return result;
   }
 }
