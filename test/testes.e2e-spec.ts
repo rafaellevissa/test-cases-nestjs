@@ -1,10 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
 import { TestesModule } from '../src/testes/testes.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { TestesService } from '../src/testes/testes.service';
 import { ConfigModule } from '@nestjs/config';
+
+const nonExistentValue = 'nonExistentValue';
 
 describe('TestesController (e2e)', () => {
   let app: INestApplication;
@@ -12,18 +14,20 @@ describe('TestesController (e2e)', () => {
     findAll: () => [
       { testValue: 'Teste 2', otherValue: 2, uniqueValue: 'Test1' },
     ],
-    findOne: (value: string) => ({
-      testValue: 'Teste 1',
-      otherValue: 1,
-      uniqueValue: value,
-    }),
+    findOne: (value: string) => {
+      if (value === nonExistentValue) {
+        return null;
+      }
+      return { testValue: 'Teste 1', otherValue: 1, uniqueValue: value };
+    },
     create: (dto: any) => ({ ...dto, id: '1' }),
     update: (value: string, dto: any) => ({ ...dto, uniqueValue: value }),
-    remove: (value: string) => ({
-      testValue: 'Teste 1',
-      otherValue: 1,
-      uniqueValue: value,
-    }),
+    remove: (value: string) => {
+      if (value === nonExistentValue) {
+        return null;
+      }
+      return { testValue: 'Teste 1', otherValue: 1, uniqueValue: value };
+    },
   };
 
   beforeAll(async () => {
@@ -39,6 +43,7 @@ describe('TestesController (e2e)', () => {
       .compile();
 
     app = moduleRef.createNestApplication();
+    app.useGlobalPipes(new ValidationPipe());
     await app.init();
   });
 
@@ -94,5 +99,70 @@ describe('TestesController (e2e)', () => {
       .delete(`/testes/${mockDeleteTeste.uniqueValue}`)
       .expect(200)
       .expect(mockDeleteTeste);
+  });
+
+  it('should return 400 if creating a test object with invalid data', async () => {
+    const invalidData = {
+      uniqueValue: '',
+      testValue: 1,
+      otherValue: 'invalid',
+    };
+
+    const response = await request(app.getHttpServer())
+      .post('/testes')
+      .send(invalidData)
+      .expect(400);
+
+    expect(response.body.message).toContain('uniqueValue should not be empty');
+    expect(response.body.message).toContain('testValue must be a string');
+    expect(response.body.message).toContain('otherValue must be a number');
+  });
+
+  it('should return 404 if test object is not found', async () => {
+    const response = await request(app.getHttpServer())
+      .get(`/testes/${nonExistentValue}`)
+      .expect(404);
+
+    expect(response.body.message).toContain(
+      `Test ${nonExistentValue} not found`,
+    );
+  });
+
+  it('should return 400 if updating a test object with invalid data', async () => {
+    const createDto = {
+      testValue: 'Teste Novo',
+      otherValue: 3,
+      uniqueValue: 'Test1',
+    };
+
+    const createdResponse = await request(app.getHttpServer())
+      .post('/testes')
+      .send(createDto)
+      .expect(201);
+
+    const invalidUpdateData = {
+      testValue: ' ',
+      otherValue: 'invalid',
+    };
+
+    const response = await request(app.getHttpServer())
+      .patch(`/testes/${createdResponse.body.uniqueValue}`)
+      .send(invalidUpdateData)
+      .expect(400);
+
+    expect(response.body.message).toContain(
+      'Field testValue should not be empty or contain only spaces',
+    );
+    expect(response.body.message).toContain(
+      'otherValue must be a number conforming to the specified constraints',
+    );
+  });
+
+  it('should return 404 if deleting a test object that does not exist', async () => {
+    const response = await request(app.getHttpServer())
+      .delete(`/testes/${nonExistentValue}`)
+      .expect(404);
+
+    expect(response.body.message).toEqual(`Test ${nonExistentValue} not found`);
   });
 });

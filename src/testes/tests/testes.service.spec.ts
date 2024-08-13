@@ -124,4 +124,43 @@ describe('TestesService', () => {
     const result = await service.remove('1');
     expect(result).toEqual(mockDeleteResult);
   });
+
+  it('should throw an error if creation fails', async () => {
+    const errorMessage = 'Error creating test object';
+    jest.spyOn(model, 'create').mockImplementationOnce(() => {
+      throw new Error(errorMessage);
+    });
+
+    await expect(service.create(mock)).rejects.toThrow(errorMessage);
+  });
+
+  it('should throw an error if findOne fails', async () => {
+    const errorMessage = 'Error finding test object';
+    jest.spyOn(model, 'findOne').mockReturnValue({
+      exec: jest.fn().mockRejectedValueOnce(new Error(errorMessage)),
+    } as any);
+
+    await expect(service.findOne('1')).rejects.toThrow(errorMessage);
+  });
+
+  it('should throw an error if update fails', async () => {
+    const errorMessage = 'Error updating test object';
+    const updateTest = { testValue: 'Teste Updated', otherValue: 1 };
+
+    jest.spyOn(model, 'findOneAndUpdate').mockReturnValue({
+      exec: jest.fn().mockRejectedValueOnce(new Error(errorMessage)),
+    } as any);
+
+    await expect(service.update('1', updateTest)).rejects.toThrow(errorMessage);
+  });
+
+  it('should throw an error if delete fails', async () => {
+    const errorMessage = 'Error deleting test object';
+
+    jest.spyOn(model, 'findOneAndDelete').mockReturnValue({
+      exec: jest.fn().mockRejectedValueOnce(new Error(errorMessage)),
+    } as any);
+
+    await expect(service.remove('1')).rejects.toThrow(errorMessage);
+  });
 });

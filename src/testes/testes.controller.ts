@@ -6,6 +6,9 @@ import {
   Patch,
   Param,
   Delete,
+  UsePipes,
+  ValidationPipe,
+  NotFoundException,
 } from '@nestjs/common';
 import { TestesService } from './testes.service';
 import { CreateTestesDto } from './dto/create-testes.dto';
@@ -16,7 +19,8 @@ export class TestesController {
   constructor(private readonly testesService: TestesService) {}
 
   @Post()
-  create(@Body() createTestisDto: CreateTestesDto) {
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+  async create(@Body() createTestisDto: CreateTestesDto) {
     return this.testesService.create(createTestisDto);
   }
 
@@ -27,19 +31,27 @@ export class TestesController {
 
   @Get(':uniqueValue')
   findOne(@Param('uniqueValue') uniqueValue: string) {
-    return this.testesService.findOne(uniqueValue);
+    const teste = this.testesService.findOne(uniqueValue);
+    if (!teste) {
+      throw new NotFoundException(`Test ${uniqueValue} not found`);
+    }
+    return teste;
   }
 
   @Patch(':uniqueValue')
   update(
     @Param('uniqueValue') uniqueValue: string,
-    @Body() updateTestisDto: UpdateTestesDto,
+    @Body() updateTestesDto: UpdateTestesDto,
   ) {
-    return this.testesService.update(uniqueValue, updateTestisDto);
+    return this.testesService.update(uniqueValue, updateTestesDto);
   }
 
   @Delete(':uniqueValue')
   remove(@Param('uniqueValue') uniqueValue: string) {
-    return this.testesService.remove(uniqueValue);
+    const deletedTeste = this.testesService.remove(uniqueValue);
+    if (!deletedTeste) {
+      throw new NotFoundException(`Test ${uniqueValue} not found`);
+    }
+    return deletedTeste;
   }
 }

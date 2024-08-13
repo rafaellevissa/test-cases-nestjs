@@ -117,4 +117,33 @@ describe('TestesController', () => {
       expect(result).toEqual(mockDeleteResult);
     });
   });
+
+  it('should throw an error if creation fails', async () => {
+    const errorMessage = 'Error creating test object';
+    jest
+      .spyOn(service, 'create')
+      .mockRejectedValueOnce(new Error(errorMessage));
+
+    await expect(controller.create(mockTestesDto)).rejects.toThrow(
+      errorMessage,
+    );
+  });
+
+  it('should throw an error if findOne fails', async () => {
+    const errorMessage = 'Error finding test object';
+    jest
+      .spyOn(service, 'findOne')
+      .mockRejectedValueOnce(new Error(errorMessage));
+
+    await expect(controller.findOne('1')).rejects.toThrow(errorMessage);
+  });
+
+  it('should throw an error if delete fails', async () => {
+    const errorMessage = 'Error deleting test object';
+    jest
+      .spyOn(service, 'remove')
+      .mockRejectedValueOnce(new Error(errorMessage));
+
+    await expect(controller.remove('1')).rejects.toThrow(errorMessage);
+  });
 });
